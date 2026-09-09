@@ -1,0 +1,18 @@
+<!DOCTYPE html>
+<html>
+  <head>
+    <title>My Page</title>
+    <script type="text/javascript" src="MV.js"></script>
+    <script type="text/javascript" src="p3.js"></script>
+    <script id="wgsl" type="x-shader" src="p3.wgsl"></script>
+  </head>
+  <body>
+    <canvas id="my-canvas" width="512" height="512" onclick="onClick(event)">
+      Please use a browser that supports HTML5 canvas.
+    </canvas>
+    <button onclick="clearCanvas()">reset & update canvas</button>
+    <input type="color" id="canvas-color" value="#6495ED"">
+    <br>point color
+    <input type="color" id="point-color" value="#000000"">
+  </body>
+</html>

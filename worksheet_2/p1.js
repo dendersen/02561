@@ -1,10 +1,20 @@
 "use strict";
 window.onload = function() { main(); }
 
-function add_point(array, point, color_array, color)
+function add_vector(position_array, point, color_array, color)
 {
-  array.push(point);
+  position_array.push(point);
   color_array.push(color);
+}
+
+function add_point(position_array, color_array, point, size, color)
+{
+  const offset = size/2;
+  var point_coords = [ vec2(point[0] - offset, point[1] - offset), vec2(point[0] + offset, point[1] - offset),
+  vec2(point[0] - offset, point[1] + offset), vec2(point[0] - offset, point[1] + offset),
+  vec2(point[0] + offset, point[1] - offset), vec2(point[0] + offset, point[1] + offset) ];
+  position_array.push.apply(position_array, point_coords);
+  color_array.push(color, color, color, color, color, color);
 }
 
 /**
@@ -32,9 +42,9 @@ function add_triangle(position_array, color_array, p1, p2, p3, color){
     color2 = color;
     color3 = color;
   }
-  add_point(position_array, p1, color_array, color1);
-  add_point(position_array, p2, color_array, color2);
-  add_point(position_array, p3, color_array, color3);
+  add_vector(position_array, p1, color_array, color1);
+  add_vector(position_array, p2, color_array, color2);
+  add_vector(position_array, p3, color_array, color3);
 }
 
 let rotate_point = function(center, rotation, p){
@@ -101,13 +111,35 @@ function add_circle(position_array, color_array, center, radius, color, segments
   }
 }
 
-function render(device, context, pipeline, positions, colors, timestamp){
+function onClick(event){
+  let rec = event.target.getBoundingClientRect();
+  let x = (event.clientX - rec.left) / rec.width * 2 - 1;
+  let y = (rec.bottom - event.clientY) / rec.height * 2 - 1;
+  clickArray.push(vec2(x, y));
+} 
+
+var clickArray = [];
+
+function draw(positions, colors, seconds){
+  /*const positionIndex = seconds * 0.8;
+  let radius = 0.35;
+  let position = positionIndex % (2.0 - radius * 2) - 1.0 + radius;
+
+  position = 1.0 - 2.0 * Math.abs(position);
+  position -= radius
+  add_circle(positions, colors, vec2(0.0, position), radius, vec3(1.0, 1.0, 1.0));*/
+  for (let i = 0; i < clickArray.length; i++){
+    add_point(positions, colors, clickArray[i], 0.025, vec3(0.0, 0.0, 0.0));
+  }
+}
+
+function render(device, context, pipeline, timestamp){
   // Update animation state
   const seconds = timestamp / 1000;
-  const positionIndex = seconds * 0.8;
+
 
   const encoder = device.createCommandEncoder();
-
+  
   const pass = encoder.beginRenderPass({
     colorAttachments: [{
       view: context.getCurrentTexture().createView(),
@@ -122,15 +154,25 @@ function render(device, context, pipeline, positions, colors, timestamp){
     }]
   });
 
-  positions.length = 0;
-  colors.length = 0;
+  let positions = [];
+  let colors = [];
 
-  let radius = 0.35;
-  let position = positionIndex % (2.0 - radius * 2) - 1.0 + radius;
+  draw(positions, colors, seconds);
 
-  position = 1.0 - 2.0 * Math.abs(position);
-  position -= radius
-  add_circle(positions, colors, vec2(0.0, position), radius, vec3(1.0, 1.0, 1.0));
+  if (positions.length === 0) {
+    console.log("No positions to draw, skipping render pass.");
+    pass.end();
+    device.queue.submit([encoder.finish()]);
+    requestAnimationFrame(
+      render.bind(
+        null,
+        device,
+        context,
+        pipeline,
+      )
+    );
+    return;
+  }
 
   const positionBuffer = device.createBuffer({
     size: flatten(positions).byteLength,
@@ -157,8 +199,6 @@ function render(device, context, pipeline, positions, colors, timestamp){
       device,
       context,
       pipeline,
-      positions,
-      colors,
     )
   );
 }
@@ -175,7 +215,7 @@ async function main()
     device: device,
     format: canvasFormat,
   });
-  const wgslfile = "p5.wgsl";
+  const wgslfile = "p1.wgsl";
   const wgslcode = await fetch(wgslfile).then(r => r.text());
   const wgsl = device.createShaderModule({
     code: wgslcode
@@ -211,21 +251,12 @@ async function main()
     primitive: { topology: 'triangle-list', },
   });
 
-  var positions = [];
-  var colors = [];
-
-
-  // device.queue.writeBuffer(positionBuffer, /*bufferOffset=*/0, flatten(positions));
-  // device.queue.writeBuffer(colorBuffer, /*bufferOffset=*/0, flatten(colors));
-
   requestAnimationFrame(
     render.bind(
       null,
       device,
       context,
       pipeline,
-      positions,
-      colors,
     )
   );
 }
