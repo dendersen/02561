@@ -22,8 +22,14 @@ function click_triangle_callBack(position_array, color_array){
   let x = mouse_x;
   let y = mouse_y;
   let color = readColor("point-color",false);
-  for (let i = 0; i < tempArray.length; i++){
-    add_point(position_array, color_array, tempArray[i], 0.05, tempColorArray[i]);
+  if (tempArray.length == 1){
+    add_line(position_array, color_array, tempArray[0], vec2(x, y), 0.01, tempColorArray[0], color);
+  }
+  if (tempArray.length == 2){
+    add_triangle(position_array, color_array, tempArray[0], tempArray[1], vec2(x, y), [tempColorArray[0], tempColorArray[1], color]);
+  }
+  if (tempArray.length == 3){
+    add_triangle(position_array, color_array, tempArray[0], tempArray[1], tempArray[2], tempColorArray);
   }
 }
 
@@ -49,12 +55,48 @@ function click_triangle(x, y, color){
   }
 }
 
+function click_circle_callBack(position_array, color_array){
+  if (tempArray.length == 0){
+    clickCallBack = null;
+    return;
+  }
+  let x = mouse_x;
+  let y = mouse_y;
+  let color = readColor("point-color",false);
+  if (tempArray.length == 1){
+    let center = tempArray[0];
+    let radius = Math.sqrt(Math.pow(x - center[0], 2) + Math.pow(y - center[1], 2));
+    add_circle(position_array, color_array, center, radius, tempColorArray[0], color);
+  }
+}
+
+function click_circle(x, y, color){
+  if (tempArray.length == 0){
+    tempArray.push(vec2(x, y));
+    tempColorArray.push(color);
+    clickCallBack = click_circle_callBack;
+  }
+  else if (tempArray.length == 1){
+    tempArray.push(vec2(x, y));
+    tempColorArray.push(color);
+    let center = tempArray[0];
+    let radius = Math.sqrt(Math.pow(x - center[0], 2) + Math.pow(y - center[1], 2));
+    add_circle(VertexArray, VertexColorArray, center, radius, tempColorArray[0], color);
+    tempArray.length = 0;
+    tempColorArray.length = 0;
+    clickCallBack = null;
+    tempArray.length = 0;
+  }
+}
+
 function updateClickEffect(){
   let clickEffect = document.getElementById("click-effect").value;
   if (clickEffect == "points"){
     clickTarget = click_point;
   }else if (clickEffect == "triangles"){
     clickTarget = click_triangle;
+  }else if (clickEffect == "circles"){
+    clickTarget = click_circle;
   }
 }
 
