@@ -1,0 +1,59 @@
+<!DOCTYPE html>
+<html>
+  <head>
+    <title>My Page</title>
+    <script type="text/javascript">var noStart = false;</script>
+    <script type="text/javascript" src="../MV.js"></script>
+    <script type="text/javascript" src="class.js"></script>
+    <script type="text/javascript" src="../main.js"></script>
+    <script type="text/javascript" src="../drawingAssist.js"></script>
+    <script id="wgsl" type="x-shader" src="../p.wgsl"></script>
+    <script type="text/javascript" src="render.js"></script>
+    <script type="text/javascript" src="UI.js"></script>
+    <script type="text/javascript">
+      window.onload = function() { main(); }
+    </script>
+  </head>
+  <body>
+    <canvas id="my-canvas" width="512" height="512" onmousemove="onMouseMove(event)" onclick="builder.addVertex()">
+      Please use a browser that supports HTML5 canvas.
+    </canvas>
+    <br>
+    <input type="button" value="Add Polygon" onclick="polygonArray.push(builder.build()); setSelector();">
+    naming: <input type="text" id="polygon-name" value="0">
+    <br>
+    <input type="button" value="pause Polygon" onclick="builder.pause()">
+    <br>
+    <input type="button" value="clear Polygon" onclick="builder.clear()">
+    number of vertices: <output id="num-vertices">0</output>
+    <br>
+    <input type="button" value="demo Polygon" onclick="builder.flipDemoMode()">
+    <br><br>
+    <button onclick="clearCanvas()">reset canvas</button>
+    <button onclick="setCanvesColor()">set canvas color</button>
+    <br>
+    canvas color
+    <input type="color" id="canvas-color" value="#6495ED"">
+    <br><br>
+    point color
+    <input type="color" id="point-color" value="#000000"">
+    <br><br>
+    slect a polygon to edit:<br>
+    <select type="select", id="polygon-selector", onchange="selectPolygon()"></select>
+    <br>
+    <input id="load-polygon" type="button" value="load polygon to builder" onclick="loadPolygonToBuilder()">
+    <br>
+    <input id="delete-polygon" type="button" value="delete polygon" onclick="removePolygon()">
+    <br>
+    slect a vertex to edit:<br>
+    <select type="select", id="polygon-vertex-selector"></select>
+    <br>
+    <input type="button" value="toggle vertex highlight" onclick="drawSel = !drawSel">
+    <br>
+    <input id="delete-vertex", type="button" value="delete selected vertex" onclick="deleteSelectedVertex()">
+    <br>
+    <input id="replace-vertex", type="button" value="replace selected vertex" onclick="replaceSelectedVertex()">
+    <br><br><br>
+    <a href="../">back to main page</a>
+  </body>
+</html>

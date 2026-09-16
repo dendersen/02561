@@ -1,0 +1,48 @@
+<!DOCTYPE html>
+<html>
+  <head>
+    <title>Affine transformations and viewing</title>
+    <style>
+      .canvas-row {
+        display: flex;
+        align-items: flex-start;
+        gap: 1rem;
+        margin-bottom: 1rem;
+      }
+      .canvas-row p {
+        max-width: 28rem;
+      }
+    </style>
+    <script type="text/javascript">var noStart = true;</script>
+    <script type="text/javascript" src="MV.js"></script>
+    <script type="text/javascript" src="p1.js"></script>
+    <script type="text/javascript" src="p2.js"></script>
+    <script type="text/javascript" src="p3.js"></script>
+    <script id="wgsl" type="x-shader" src="p2.wgsl"></script>
+  </head>
+  <body>
+    <div class="canvas-row">
+      <canvas id="my-canvas" width="512" height="512">
+        Please use a browser that supports HTML5 canvas.
+      </canvas>
+      <p><strong>Part 1:</strong> The cube is transformed by the view and orthographic projection matrices:<br><code>M_st * P_ortho * V</code></p>
+    </div>
+    <div class="canvas-row">
+      <canvas id="triple-canvas" width="512" height="512">
+        Please use a browser that supports HTML5 canvas.
+      </canvas>
+      <p>
+        <strong>Part 2:</strong> All three cubes share one pinhole camera with a 45-degree vertical field of view:
+        <br><code>M_st * P_perspective * V</code><br><br>
+        The model transforms are applied separately before the shared view transformation:
+        <br><strong>One-point:</strong> <code>T_center * S * T_left</code>
+        <br><strong>Two-point:</strong> <code>T_center * S * R_y * T_right</code>
+        <br><strong>Three-point:</strong> <code>T_center * S * R_y * R_x * T_bottom</code>
+        <br><br>
+        The rightmost model matrix acts first. The three transformed cubes are combined into one vertex buffer and rendered in one pass.
+      </p>
+    </div>
+    <br><br>
+    <a href="../">back to main page</a>
+  </body>
+</html>

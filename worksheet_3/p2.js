@@ -1,6 +1,55 @@
 "use strict";
+var cube_parms = [
+  (cube) => {
+    const rot = [
+      translate(-0.5, -0.5, -0.5),
+      scalem(0.6, 0.6, 0.6),
+      translate(0.75, 0.5, 0.0),
+    ];
+    for (let r = 0; r < rot.length; r++) {
+      for (let i = 0; i < cube.length; i++) {
+        const rotatedPoint = mult(rot[r], vec4(cube[i], 1.0));
+        cube[i] = vec3(rotatedPoint[0], rotatedPoint[1], rotatedPoint[2]);
+      }
+    }
+    return cube;
+  },
+  (cube) => {
+    const rot = [
+      translate(-0.5, -0.5, -0.5),
+      scalem(0.6, 0.6, 0.6),
+      rotate(45, vec3(0.0, 1.0, 0.0)),
+      translate(-0.75, 0.5, 0.0),
+    ];
+    for (let r = 0; r < rot.length; r++) {
+      for (let i = 0; i < cube.length; i++) {
+        const rotatedPoint = mult(rot[r], vec4(cube[i], 1.0));
+        cube[i] = vec3(rotatedPoint[0], rotatedPoint[1], rotatedPoint[2]);
+      }
+    }
+    return cube;
+  },
+  (cube) => {
+    const rot = [
+      translate(-0.5, -0.5, -0.5),
+      scalem(0.6, 0.6, 0.6),
+      rotate(45, vec3(0.0, 1.0, 0.0)),
+      rotate(45, vec3(1.0, -0.0, 0.0)),
+      translate(0.0, -0.5, 0.0),
+    ];
+    for (let r = 0; r < rot.length; r++) {
+      for (let i = 0; i < cube.length; i++) {
+        const rotatedPoint = mult(rot[r], vec4(cube[i], 1.0));
+        cube[i] = vec3(rotatedPoint[0], rotatedPoint[1], rotatedPoint[2]);
+      }
+    }
+    return cube;
+  }, 
+]
 if (typeof(noStart) == 'boolean' && !noStart){
-  window.onload = function() { main(); }
+  window.onload = function() {
+    main_cube(cube_parms);
+  }
 }
 
 function add_vector(position_array, point, color_array, color)
@@ -107,7 +156,11 @@ function drawPlane3d(position_array, color_array, p1, p2, p3, p4, color){
 
 function drawCube3D(position_array, color_array, p1, p2, p3, p4, p5, p6, p7, p8, color, wireFrame){
   if (typeof(wireFrame) == 'undefined'){
-    wireFrame = false;
+    wireFrame = 0;
+  }else if (typeof(wireFrame) == 'boolean'){
+    wireFrame = wireFrame ? 0.01 : 0;
+  }else{
+    wireFrame = 0.0;
   }
   let color1,color2,color3,color4,color5,color6,color7,color8;
   if (Array.isArray(color) && color.length > 0){
@@ -139,7 +192,7 @@ function drawCube3D(position_array, color_array, p1, p2, p3, p4, p5, p6, p7, p8,
     color7 = color;
     color8 = color;
   }
-  if (wireFrame) {
+  if (wireFrame != 0.0) {
     const edges = [
       [p1, p2, color1, color2], [p2, p3, color2, color3],
       [p3, p4, color3, color4], [p4, p1, color4, color1],
@@ -161,14 +214,13 @@ function drawCube3D(position_array, color_array, p1, p2, p3, p4, p5, p6, p7, p8,
     drawPlane3d(position_array, color_array, p1, p2, p3, p4, [color1, color2, color3, color4]);
   }
 }
-var VertexArray = [];
-var VertexColorArray = [];
+
 var canvasColor = vec4(0.3921, 0.5843, 0.9294, 1.0);
-async function main() {
+async function main_cube(cubeParms) {
   const gpu = navigator.gpu;
   const adapter = await gpu.requestAdapter();
   const device = await adapter.requestDevice();
-  const canvas = document.getElementById('my-canvas');
+  const canvas = document.getElementById("triple-canvas");
   const context = canvas.getContext('webgpu');
   const canvasFormat = navigator.gpu.getPreferredCanvasFormat();
   context.configure({
@@ -216,7 +268,7 @@ async function main() {
     },
   });
 
-  const eye = vec3(2.0, 2.0, 2.0);
+  const eye = vec3(0.0, 0.0, -3.0);
   const lookat = vec3(0.0, 0.0, 0.0);
   const up = vec3(0.0, 1.0, 0.0);
   const M_st = mat4(
@@ -225,9 +277,9 @@ async function main() {
     0.0, 0.0, 0.5, 0.5,
     0.0, 0.0, 0.0, 1.0,
   );
-  const projection = ortho(-1.0, 1.0, -1.0, 1.0, 0.1, 10.0);
+  const projectionMatrix = perspective(45, 512/512, 0.1, 10.0);
   const view = lookAt(eye, lookat, up);
-  const mvp = mult(M_st, mult(projection, view));
+  const mvp = mult(M_st, mult(projectionMatrix, view));
   
   const uniformBuffer = device.createBuffer({
     size: sizeof['mat4'],
@@ -266,16 +318,11 @@ async function main() {
       depthStoreOp: "store",
     },
   });
-  drawCube3D(VertexArray, VertexColorArray, 
-    vec3(1.0, 1.0, 1.0),
-    vec3(0.0, 1.0, 1.0),
-    vec3(0.0, 0.0, 1.0),
-    vec3(1.0, 0.0, 1.0),
-    vec3(1.0, 1.0, 0.0),
-    vec3(0.0, 1.0, 0.0),
-    vec3(0.0, 0.0, 0.0),
-    vec3(1.0, 0.0, 0.0),
-    [
+  var VertexArray = [];
+  var VertexColorArray = [];
+  for (let i = 0; i < cubeParms.length; i++) {
+    let cubeTransform = cubeParms[i];
+    var cube = [
       vec3(1.0, 1.0, 1.0),
       vec3(0.0, 1.0, 1.0),
       vec3(0.0, 0.0, 1.0),
@@ -284,14 +331,34 @@ async function main() {
       vec3(0.0, 1.0, 0.0),
       vec3(0.0, 0.0, 0.0),
       vec3(1.0, 0.0, 0.0)
-    ],
-    true
-  );
-  const positionBuffer = device.createBuffer({
+    ]
+
+    if (typeof(cubeTransform) == 'function'){
+      cube = cubeTransform(cube);
+    }
+
+    drawCube3D(
+      VertexArray,
+      VertexColorArray, 
+      ...cube,
+      [
+        vec3(1.0, 1.0, 1.0),
+        vec3(0.0, 1.0, 1.0),
+        vec3(0.0, 0.0, 1.0),
+        vec3(1.0, 0.0, 1.0),
+        vec3(1.0, 1.0, 0.0),
+        vec3(0.0, 1.0, 0.0),
+        vec3(0.0, 0.0, 0.0),
+        vec3(1.0, 0.0, 0.0)
+      ],
+      true,
+    );
+  }
+  var positionBuffer = device.createBuffer({
     size: flatten(VertexArray).byteLength,
     usage: GPUBufferUsage.VERTEX | GPUBufferUsage.COPY_DST,
   });
-  const colorBuffer = device.createBuffer({
+  var colorBuffer = device.createBuffer({
     size: flatten(VertexColorArray).byteLength,
     usage: GPUBufferUsage.VERTEX | GPUBufferUsage.COPY_DST,
   });
