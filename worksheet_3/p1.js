@@ -33,7 +33,7 @@ function drawTriangle3D(position_array, color_array, p1, p2, p3, color){
   add_vector(position_array, p3, color_array, color3);
 }
 
-function drawLine3D(position_array, color_array, p1, p2, color){
+function drawLine3D(position_array, color_array, p1, p2, width, color){
   let color1,color2;
   if (Array.isArray(color) && color.length > 0){
     color1 = color[0 % color.length];
@@ -46,6 +46,11 @@ function drawLine3D(position_array, color_array, p1, p2, color){
     color1 = color;
     color2 = color;
   }
+ let p1_, p2_, p3_, p4_, p5_, p6_, p7_, p8_;
+  add_vector(position_array, p1, color_array, color1);
+  add_vector(position_array, p2, color_array, color2);
+  add_vector(position_array, p1, color_array, color1);
+}
 
 function drawPlane3d(position_array, color_array, p1, p2, p3, p4, color){
   let color1,color2,color3,color4;
@@ -105,7 +110,18 @@ function drawCube3D(position_array, color_array, p1, p2, p3, p4, p5, p6, p7, p8,
     color8 = color;
   }
   if (wireFrame) {
-    // Draw wireframe
+    drawLine3D(position_array, color_array, p1, p2, [color1, color2]);
+    drawLine3D(position_array, color_array, p2, p3, [color2, color3]);
+    drawLine3D(position_array, color_array, p3, p4, [color3, color4]);
+    drawLine3D(position_array, color_array, p4, p1, [color4, color1]);
+    drawLine3D(position_array, color_array, p5, p6, [color5, color6]);
+    drawLine3D(position_array, color_array, p6, p7, [color6, color7]);
+    drawLine3D(position_array, color_array, p7, p8, [color7, color8]);
+    drawLine3D(position_array, color_array, p8, p5, [color8, color5]);
+    drawLine3D(position_array, color_array, p1, p5, [color1, color5]);
+    drawLine3D(position_array, color_array, p2, p6, [color2, color6]);
+    drawLine3D(position_array, color_array, p3, p7, [color3, color7]);
+    drawLine3D(position_array, color_array, p4, p8, [color4, color8]);
   }else{
     drawPlane3d(position_array, color_array, p1, p2, p3, p4, [color1, color2, color3, color4]);
     drawPlane3d(position_array, color_array, p5, p6, p7, p8, [color1, color2, color3, color4]);
@@ -118,8 +134,7 @@ function drawCube3D(position_array, color_array, p1, p2, p3, p4, p5, p6, p7, p8,
 var VertexArray = [];
 var VertexColorArray = [];
 var canvasColor = vec4(0.3921, 0.5843, 0.9294, 1.0);
-async function main()
-{
+async function main() {
   const gpu = navigator.gpu;
   const adapter = await gpu.requestAdapter();
   const device = await adapter.requestDevice();
