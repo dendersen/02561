@@ -113,20 +113,12 @@ class sphere3D {
       this.color2
     ));
     this.triangles.push(new Triangle3D(
-      p3,
-      p4,
       p2,
+      p4,
+      p3,
+      this.color2,
+      this.color4,
       this.color3,
-      this.color4,
-      this.color2
-    ));
-    this.triangles.push(new Triangle3D(
-      vec3(0.0, 0.0, 1.0),
-      vec3( Math.sqrt(6.0)/3, -Math.sqrt(2.0)/3, -1.0/3 ),
-      vec3(-Math.sqrt(6.0)/3, -Math.sqrt(2.0)/3, -1.0/3),
-      this.color1,
-      this.color4,
-      this.color3
     ));
     this.divisions = 0;
     this.subdivide(initialSubdivides)
@@ -381,7 +373,7 @@ async function main_cube() {
     device: device,
     format: canvasFormat,
   });
-  const wgslfile = "p1.wgsl";
+  const wgslfile = "../p3d_simple.wgsl";
   const wgslcode = await fetch(wgslfile).then(r => r.text());
   const wgsl = device.createShaderModule({
     code: wgslcode
@@ -416,7 +408,8 @@ async function main_cube() {
     targets: [{ format: canvasFormat }], },
     primitive: {
       topology: 'triangle-list',
-      cullMode: 'none',
+      cullMode: 'back',
+      frontFace: 'ccw',
     },
     depthStencil: {
       format: 'depth24plus',

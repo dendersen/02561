@@ -113,20 +113,12 @@ class sphere3D {
       this.color2
     ));
     this.triangles.push(new Triangle3D(
-      p3,
-      p4,
       p2,
+      p4,
+      p3,
+      this.color2,
+      this.color4,
       this.color3,
-      this.color4,
-      this.color2
-    ));
-    this.triangles.push(new Triangle3D(
-      vec3(0.0, 0.0, 1.0),
-      vec3( Math.sqrt(6.0)/3, -Math.sqrt(2.0)/3, -1.0/3 ),
-      vec3(-Math.sqrt(6.0)/3, -Math.sqrt(2.0)/3, -1.0/3),
-      this.color1,
-      this.color4,
-      this.color3
     ));
     this.divisions = 0;
     this.subdivide(initialSubdivides)
@@ -370,6 +362,7 @@ function tetrahedronLines(position_array, color_array, p1, p2, p3, p4, color){
 }
 
 var canvasColor = vec4(0.3921, 0.5843, 0.9294, 1.0);
+var uniformBuffer = undefined;
 async function main_cube() {
   const gpu = navigator.gpu;
   const adapter = await gpu.requestAdapter();
@@ -381,7 +374,7 @@ async function main_cube() {
     device: device,
     format: canvasFormat,
   });
-  const wgslfile = "p1.wgsl";
+  const wgslfile = "../p3d_shade.wgsl";
   const wgslcode = await fetch(wgslfile).then(r => r.text());
   const wgsl = device.createShaderModule({
     code: wgslcode
@@ -416,7 +409,8 @@ async function main_cube() {
     targets: [{ format: canvasFormat }], },
     primitive: {
       topology: 'triangle-list',
-      cullMode: 'none',
+      cullMode: 'back',
+      frontFace: 'ccw',
     },
     depthStencil: {
       format: 'depth24plus',
@@ -438,8 +432,8 @@ async function main_cube() {
   const view = lookAt(eye, lookat, up);
   const mvp = mult(M_st, mult(projectionMatrix, view));
   
-  const uniformBuffer = device.createBuffer({
-    size: sizeof['mat4'],
+  uniformBuffer = device.createBuffer({
+    size: sizeof['mat4'] + 32,
     usage: GPUBufferUsage.UNIFORM | GPUBufferUsage.COPY_DST,
   });
 
@@ -492,6 +486,33 @@ function render(device, context, pipeline, bindGroup, timestamp){
   }
   document.getElementById("frameRate").textContent = frameRate;
   oldTime = seconds;
+
+  const cameraAngle = seconds * 30;
+  const cameraEye = vec3(
+    3.0 * Math.sin(radians(cameraAngle)),
+    0.0,
+    -3.0 * Math.cos(radians(cameraAngle))
+  );
+  const cameraView = lookAt(cameraEye, vec3(0.0, 0.0, 0.0), vec3(0.0, 1.0, 0.0));
+  const cameraProjection = perspective(45, 512/512, 0.1, 10.0);
+  const cameraMvp = mult(
+    mat4(
+      1.0, 0.0, 0.0, 0.0,
+      0.0, 1.0, 0.0, 0.0,
+      0.0, 0.0, 0.5, 0.5,
+      0.0, 0.0, 0.0, 1.0,
+    ),
+    mult(cameraProjection, cameraView)
+  );
+  device.queue.writeBuffer(uniformBuffer, 0, flatten(cameraMvp));
+
+  const lightDirection = new Float32Array(
+    mult(rotate(-seconds * 20, vec3(0.1, -1.0, -0.1)), vec4(0.0, 0.0, -1.0, 0.0))
+  );
+  const lightEmission = new Float32Array([1.0, 1.0, 1.0, 0.0]);
+  device.queue.writeBuffer(uniformBuffer, sizeof['mat4'], lightDirection);
+  device.queue.writeBuffer(uniformBuffer, sizeof['mat4'] + 16, lightEmission);
+
   const encoder = device.createCommandEncoder();
   if (depthTexture === undefined || depthTexture.width !== context.canvas.width || depthTexture.height !== context.canvas.height) {
     depthTexture = device.createTexture({
@@ -519,15 +540,11 @@ function render(device, context, pipeline, bindGroup, timestamp){
   if (resetBuff) {
     positions_org = [];
     colors_org = [];
-    positions = [];
     sphere.draw(positions_org, colors_org);
-    positions = Array.from(positions_org);
-  }
-  for (let i = 0; i < positions_org.length; i++) {
-    positions[i] = mult(rotateY(seconds * 30), positions_org[i]);
+    document.getElementById("verts").textContent = positions_org.length / 3;
   }
 
-  if (positions.length === 0) {
+  if (positions_org.length === 0) {
     pass.end();
     device.queue.submit([encoder.finish()]);
     requestAnimationFrame(
@@ -542,7 +559,7 @@ function render(device, context, pipeline, bindGroup, timestamp){
     return;
   }
 
-  let flatPos = flatten(positions);
+  let flatPos = flatten(positions_org);
   let flatCol = flatten(colors_org);
 
   if (resetBuff || positionBuffer === undefined) {
@@ -566,7 +583,7 @@ function render(device, context, pipeline, bindGroup, timestamp){
   pass.setBindGroup(0, bindGroup);
   pass.setVertexBuffer(0, positionBuffer);
   pass.setVertexBuffer(1, colorBuffer);
-  pass.draw(positions.length);
+  pass.draw(positions_org.length);
   pass.end();
   device.queue.submit([encoder.finish()]);
 
