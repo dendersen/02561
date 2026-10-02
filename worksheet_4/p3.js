@@ -419,6 +419,10 @@ async function main_cube() {
     },
   });
 
+  uniformBuffer = device.createBuffer({
+    size: sizeof['mat4'] + sizeof['vec4'] * 2,
+    usage: GPUBufferUsage.UNIFORM | GPUBufferUsage.COPY_DST,
+  });
   const eye = vec3(0.0, 0.0, -3.0);
   const lookat = vec3(0.0, 0.0, 0.0);
   const up = vec3(0.0, 1.0, 0.0);
@@ -431,12 +435,9 @@ async function main_cube() {
   const projectionMatrix = perspective(45, 512/512, 0.1, 10.0);
   const view = lookAt(eye, lookat, up);
   const mvp = mult(M_st, mult(projectionMatrix, view));
-  
-  uniformBuffer = device.createBuffer({
-    size: sizeof['mat4'] + 32,
-    usage: GPUBufferUsage.UNIFORM | GPUBufferUsage.COPY_DST,
-  });
 
+  
+  device.queue.writeBuffer(uniformBuffer, 0, flatten(mvp));
   const bindGroup = device.createBindGroup({
     layout: pipeline.getBindGroupLayout(0),
     entries: [{
@@ -445,7 +446,6 @@ async function main_cube() {
     }],
   });
 
-  device.queue.writeBuffer(uniformBuffer, 0, flatten(mvp));
   requestAnimationFrame(
     render.bind(
       null,
@@ -487,6 +487,7 @@ function render(device, context, pipeline, bindGroup, timestamp){
   document.getElementById("frameRate").textContent = frameRate;
   oldTime = seconds;
 
+
   const cameraAngle = seconds * 30;
   const cameraEye = vec3(
     3.0 * Math.sin(radians(cameraAngle)),
@@ -506,7 +507,9 @@ function render(device, context, pipeline, bindGroup, timestamp){
   );
   device.queue.writeBuffer(uniformBuffer, 0, flatten(cameraMvp));
 
-  const lightDirection = new Float32Array(0.0, 0.0, -1.0, 0.0);
+  const lightDirection = new Float32Array(
+    vec4(0.0, 0.0, -1.0, 0.0)
+  );
   const lightEmission = new Float32Array([1.0, 1.0, 1.0, 0.0]);
   device.queue.writeBuffer(uniformBuffer, sizeof['mat4'], lightDirection);
   device.queue.writeBuffer(uniformBuffer, sizeof['mat4'] + 16, lightEmission);
