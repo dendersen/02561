@@ -1,0 +1,56 @@
+<!DOCTYPE html>
+<html>
+	<head>
+		<meta charset="utf-8">
+		<title>Shading questions</title>
+		<style>
+			.canvas-row {
+				display: flex;
+				align-items: flex-start;
+				gap: 1rem;
+				margin-bottom: 1rem;
+			}
+			.canvas-row iframe {
+				border: 1px solid #999;
+				width: 540px;
+				height: 620px;
+			}
+			.canvas-row p { max-width: 28rem; }
+		</style>
+	</head>
+	<body>
+		<h1>Part 6: Shading Questions</h1>
+
+		<div class="canvas-row">
+			<iframe src="p3.html" title="Part 3 Gouraud shading"></iframe>
+			<p><strong>a) Shading:</strong><br>
+				<strong>Flat</strong> uses one face normal and color per triangle.<br>
+				<strong>Gouraud</strong> lights vertices and interpolates colors.<br>
+				<strong>Phong</strong> interpolates positions and normals, then lights each fragment.<br><br>
+				Flat shading uses<br>
+				<code>normalize(cross(p2 - p1, p3 - p1))</code> for the whole face.<br><br>
+				Phong gives better highlights because it evaluates them at every fragment.</p>
+		</div>
+
+		<div class="canvas-row">
+			<iframe src="p4.html" title="Part 4 vertex Phong shading"></iframe>
+			<p><strong>b) Directional and point lights:</strong><br>
+				A directional light has one constant direction. A point light has a position,
+				so its direction changes across the object.<br><br>
+				<strong>c) Eye position:</strong><br>
+				It changes the view direction and specular highlight, but not ambient or diffuse light.</p>
+		</div>
+
+		<div class="canvas-row">
+			<iframe src="p5.html" title="Part 5 fragment Phong shading"></iframe>
+			<p><strong>d) Specular term (0, 0, 0):</strong><br>
+				Specular highlights disappear.<br><br>
+				<strong>e) Larger shininess exponent alpha:</strong><br>
+				The highlight becomes smaller and sharper.<br><br>
+				<strong>f) Coordinate space:</strong><br>
+				Lighting uses object/world space. The MVP only projects positions for display.</p>
+		</div>
+
+		<a href="index.html">Back to Worksheet</a>
+	</body>
+</html>

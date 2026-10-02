@@ -389,7 +389,7 @@ async function main_cube() {
     device: device,
     format: canvasFormat,
   });
-  const wgslfile = "p4.wgsl";
+  const wgslfile = "p5.wgsl";
   const wgslcode = await fetch(wgslfile).then(r => r.text());
   const wgsl = device.createShaderModule({
     code: wgslcode
