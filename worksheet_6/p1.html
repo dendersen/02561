@@ -1,0 +1,26 @@
+<!DOCTYPE html>
+<html>
+  <head>
+    <title>My Page</title>
+    <script type="text/javascript" src="../MV.js"></script>
+    <script type="text/javascript" src="../OBJParser.js"></script>
+    <script type="text/javascript" src="p1.js"></script>
+    <script id="wgsl" type="x-shader" src="p1.wgsl"></script>
+  </head>
+  <body>
+    <canvas id="triple-canvas" width="512" height="512">
+      Please use a browser that supports HTML5 canvas.
+    </canvas>
+    <br>
+    <label>kd <input type="range" id="kd" min="0" max="1" step="0.01" value="0.8"><output id="kdValue">0.80</output></label><br>
+    <label>ks <input type="range" id="ks" min="0" max="1" step="0.01" value="0.7"><output id="ksValue">0.70</output></label><br>
+    <label>s <input type="range" id="shininess" min="1" max="128" step="1" value="32"><output id="shininessValue">32</output></label><br>
+    <label>Le <input type="range" id="Le" min="0" max="2" step="0.01" value="1"><output id="LeValue">1.00</output></label><br>
+    <label>La <input type="range" id="La" min="0" max="1" step="0.01" value="0.1"><output id="LaValue">0.10</output></label>
+    <br>
+    frame rate: <output id="frameRate">0</output><br>
+    face count: <output id="verts">0</output>
+    <br><br>
+		<a href="index.html">Back to Worksheet</a>
+  </body>
+</html>
