@@ -174,46 +174,65 @@ class obj3D {
   }
 }
 class any3D{
-  constructor(vertexes, colors, faces, path = undefined){
+  constructor(vertexes, colors, faces, texturePath = undefined, texcoords = []){
     this.vertexes = vertexes;
-    if (typeof(path) != 'undefined') {
-      if (typeof(colors) == 'undefined') {
-        colors = [];
-        for(let i = 0; i < vertexes.length; i+=2) {
-          colors.push(vec4(1.0, 0.0, 1.0, 1.0));
-          colors.push(vec4(0.0, 0.0, 0.0, 1.0));
-        }
+    this.texturePath = texturePath;
+    this.texcoords = texcoords.length > 0
+      ? texcoords
+      : vertexes.map(vertex => vec2((vertex[0] + 4.0) / 8.0, (-vertex[2] - 1.0) / 20.0));
+    this.textureBindGroup = undefined;
+    if (typeof(colors) == 'undefined') {
+      colors = [];
+      for(let i = 0; i < vertexes.length; i+=2) {
+        colors.push(vec4(1.0, 0.0, 1.0, 1.0));
+        colors.push(vec4(0.0, 0.0, 0.0, 1.0));
       }
-      if (Array.isArray(colors) && colors.length > 0 && !Array.isArray(colors[0])) {
-        let color = colors;
-        colors = [];
-        for(let i = 0; i < vertexes.length; i++) {
-          colors.push(color);
-        }
-      }
-      if (colors.length != vertexes.length) {
-        let len = colors.length;
-        for (let i = len; i < vertexes.length; i++) {
-          colors.push(colors[i % len]);
-        }
-      }
-      for (let i = 0; i < colors.length; i++) {
-        colors[i] = vec4(colors[i],1.0,1.0,1.0,1.0)
-      }
-      this.colors = colors;
-    }else{
-      colors = undefined;
-      this.textureBuffer = undefined;
     }
+    if (Array.isArray(colors) && colors.length == 0) {
+      let template=[
+        vec3(1.0,0.0,0.0),
+        vec3(0.0,1.0,0.0),
+        vec3(0.0,0.0,1.0),
+        vec3(1.0,1.0,0.0),
+        vec3(0.0,1.0,1.0),
+        vec3(1.0,0.0,1.0),
+        vec3(1.0,1.0,1.0),
+        vec3(0.0,0.0,0.0),
+      ]
+      for (let i = 0; i < vertexes.length; i++) {
+        colors.push(vec4(...template[i % template.length], 1.0));
+      }
+    }
+    if (Array.isArray(colors) && colors.length > 0 && !Array.isArray(colors[0])) {
+      let color = colors;
+      colors = [];
+      for(let i = 0; i < vertexes.length; i++) {
+        colors.push(vec4(...color,1.0,1.0,1.0,1.0));
+      }
+    }
+    if (colors.length != vertexes.length) {
+      let len = colors.length;
+      for (let i = len; i < vertexes.length; i++) {
+        colors.push(colors[i % len]);
+      }
+    }
+    for (let i = 0; i < colors.length; i++) {
+      colors[i] = vec4(...colors[i],1.0,1.0,1.0,1.0)
+    }
+    this.colors = colors;
     this.faces = faces;
   }
-  draw(position_array, color_array){
+  draw(position_array, color_array, texcoord_array){
     for (let i = 0; i < this.faces.length; i++) {
       let f = this.faces[i];
       let i1 = f[0];
       let i2 = f[1];
       let i3 = f[2];
-      drawTriangle3D(position_array, color_array, this.vertexes[i1], this.vertexes[i2], this.vertexes[i3], [this.colors[f[0]], this.colors[f[1]], this.colors[f[2]]]);
+      let c1 = this.colors[i1];
+      let c2 = this.colors[i2];
+      let c3 = this.colors[i3];
+      drawTriangle3D(position_array, color_array, this.vertexes[i1], this.vertexes[i2], this.vertexes[i3], [c1, c2, c3]);
+      texcoord_array.push(this.texcoords[i1], this.texcoords[i2], this.texcoords[i3]);
     }
   }
 }
@@ -482,6 +501,51 @@ function setTextureBuffer(device, textureBuffer, width, height, bytesPerRow) {
   }
 }
 
+async function createTextureBindGroup(device, imagePath) {
+  const response = await fetch(imagePath);
+  if (!response.ok) {
+    throw new Error(`Could not load texture image: ${imagePath}`);
+  }
+  const bitmap = await createImageBitmap(await response.blob());
+  const mipLevelCount = Math.floor(Math.log2(Math.max(bitmap.width, bitmap.height))) + 1;
+  const texture = device.createTexture({
+    size: [bitmap.width, bitmap.height, 1],
+    mipLevelCount: mipLevelCount,
+    format: "rgba8unorm",
+    usage: GPUTextureUsage.TEXTURE_BINDING |
+      GPUTextureUsage.COPY_DST |
+      GPUTextureUsage.RENDER_ATTACHMENT,
+  });
+  const mipCanvas = document.createElement("canvas");
+  const mipContext = mipCanvas.getContext("2d");
+  for (let mipLevel = 0; mipLevel < mipLevelCount; mipLevel++) {
+    const width = Math.max(1, bitmap.width >> mipLevel);
+    const height = Math.max(1, bitmap.height >> mipLevel);
+    mipCanvas.width = width;
+    mipCanvas.height = height;
+    mipContext.drawImage(bitmap, 0, 0, width, height);
+    device.queue.copyExternalImageToTexture(
+      { source: mipCanvas, flipY: true },
+      { texture: texture, mipLevel: mipLevel },
+      [width, height, 1]
+    );
+  }
+  bitmap.close();
+  return device.createBindGroup({
+    layout: textureBindGroupLayout,
+    entries: [{
+      binding: 0,
+      resource: { buffer: uniformBuffer },
+    }, {
+      binding: 1,
+      resource: textureSampler,
+    }, {
+      binding: 2,
+      resource: texture.createView(),
+    }],
+  });
+}
+
 function createSolidTexture(device, color) {
   const texture = device.createTexture({
     size: [1, 1, 1],
@@ -578,18 +642,6 @@ async function main_cube() {
     },
   });
 
-  const eye = vec3(0.0, 0.0, -3.0);
-  const lookat = vec3(0.0, 0.0, 0.0);
-  const up = vec3(0.0, 1.0, 0.0);
-  const M_st = mat4(
-    1.0, 0.0, 0.0, 0.0,
-    0.0, 1.0, 0.0, 0.0,
-    0.0, 0.0, 0.5, 0.5,
-    0.0, 0.0, 0.0, 1.0,
-  );
-  const projectionMatrix = perspective(45, 512/512, 0.1, 10.0);
-  const view = lookAt(eye, lookat, up);
-  const mvp = mult(M_st, mult(projectionMatrix, view));
   
   uniformBuffer = device.createBuffer({
     size: sizeof['mat4'] + sizeof['vec4'] * 7,
@@ -601,6 +653,8 @@ async function main_cube() {
     addressModeV: "repeat",
     magFilter: "linear",
     minFilter: "linear",
+    mipmapFilter: "linear",
+    maxAnisotropy: 1,
   });
   textureView = createSolidTexture(device, [255, 255, 255, 255]).createView();
 
@@ -625,16 +679,36 @@ async function main_cube() {
   // obj = new obj3D(await obj_data);
   // console.log("OBJ file loaded.");
 
-  obj.push(new any3D([
-    vec3(-4.0,-1.0,- 1.0),
-    vec3( 4.0,-1.0,- 1.0),
-    vec3( 4.0,-1.0,-21.0),
-    vec3(-4.0,-1.0,-21.0),
-  ],
-  []
+  obj.push(new any3D(
+    [// vertices
+      vec3(-4.0,-1.0,- 1.0),
+      vec3( 4.0,-1.0,- 1.0),
+      vec3( 4.0,-1.0,-21.0),
+      vec3(-4.0,-1.0,-21.0),
+    ],
+    [vec4(1.0, 1.0, 1.0, 1.0)],//colors
+    [[0, 1, 2],[0, 2, 3]],//indices
+    "squares.png",//texture path
+    [//texcoords
+      vec2(-1.5, 0.0),
+      vec2(2.5, 0.0),
+      vec2(2.5, 10.0),
+      vec2(-1.5, 10.0),
+    ]
   ));
 
-  device.queue.writeBuffer(uniformBuffer, 0, flatten(mvp));
+  for (const object of obj) {
+    object.textureBindGroup = object.texturePath
+      ? await createTextureBindGroup(device, object.texturePath)
+      : bindGroup;
+  }
+
+  const eye = vec3(0.0, 0.0, 0.0);
+  const lookat = vec3(0.0, -1.0, -8.0);
+  const up = vec3(0.0, 1.0, 0.0);
+  camera = new Camera(eye, lookat, up, new Projector(true, 90, 512/512, 0.1, 10.0));
+
+  device.queue.writeBuffer(uniformBuffer, 0, camera.Get());
   requestAnimationFrame(
     render.bind(
       null,
@@ -662,10 +736,13 @@ var positionBuffer = undefined;
 var depthTexture = undefined;
 var positions_org = [];
 var colors_org = [];
+var texcoords_org = [];
+var objectDrawRanges = [];
 let positions = [];
 var oldTime = 0;
-
 var obj = [];
+
+let camera = undefined;
 
 async function render(device, context, pipeline, timestamp){
   // Update animation state
@@ -679,24 +756,7 @@ async function render(device, context, pipeline, timestamp){
   document.getElementById("frameRate").textContent = frameRate;
   oldTime = seconds;
 
-  const cameraAngle = seconds * 30;
-  const cameraEye = vec3(
-    3.0 * Math.sin(radians(cameraAngle)),
-    0.0,
-    -3.0 * Math.cos(radians(cameraAngle))
-  );
-  const cameraView = lookAt(cameraEye, vec3(0.0, 0.0, 0.0), vec3(0.0, 1.0, 0.0));
-  const cameraProjection = perspective(45, 512/512, 0.1, 10.0);
-  const cameraMvp = mult(
-    mat4(
-      1.0, 0.0, 0.0, 0.0,
-      0.0, 1.0, 0.0, 0.0,
-      0.0, 0.0, 0.5, 0.5,
-      0.0, 0.0, 0.0, 1.0,
-    ),
-    mult(cameraProjection, cameraView)
-  );
-  device.queue.writeBuffer(uniformBuffer, 0, flatten(cameraMvp));
+  device.queue.writeBuffer(uniformBuffer, 0, camera.Get());
 
   const lightDirection = new Float32Array(
     /*mult(rotate(-seconds * 20, vec3(0.1, -1.0, -0.1)),*/ vec4(0.0, 0.0, -1.0, 0.0)//)
@@ -709,9 +769,10 @@ async function render(device, context, pipeline, timestamp){
     readSlider("shininess"),
     0.0,
   ]);
+  let cameraEye = camera.eyePos.Get();
   const diffuseColor = new Float32Array([0.2, 0.55, 1.0, 0.0]);
   const specularColor = new Float32Array([1.0, 1.0, 1.0, 0.0]);
-  const eyePosition = new Float32Array([cameraEye[0], cameraEye[1], cameraEye[2], 0.0]);
+  const eyePosition = new Float32Array([...vec3(cameraEye), 0.0]);
   device.queue.writeBuffer(uniformBuffer, sizeof['mat4'], lightDirection);
   device.queue.writeBuffer(uniformBuffer, sizeof['mat4'] + 16, lightEmission);
   device.queue.writeBuffer(uniformBuffer, sizeof['mat4'] + 32, lightAmbient);
@@ -747,7 +808,17 @@ async function render(device, context, pipeline, timestamp){
   if (resetBuff) {
     positions_org = [];
     colors_org = [];
-    obj.forEach(o => o.draw(positions_org, colors_org));
+    texcoords_org = [];
+    objectDrawRanges = [];
+    obj.forEach(o => {
+      const firstVertex = positions_org.length;
+      o.draw(positions_org, colors_org, texcoords_org);
+      objectDrawRanges.push({
+        object: o,
+        firstVertex: firstVertex,
+        vertexCount: positions_org.length - firstVertex,
+      });
+    });
     // sphere.draw(positions_org, colors_org);
     document.getElementById("verts").textContent = positions_org.length / 3;
   }resetBuff = false;
@@ -768,12 +839,7 @@ async function render(device, context, pipeline, timestamp){
 
   let flatPos = flatten(positions_org);
   let flatCol = flatten(colors_org);
-  let flatTexcoord = [];
-  for (let i = 0; i < positions_org.length; i++) {
-    const position = positions_org[i];
-    flatTexcoord.push((position[0] + 4.0) / 8.0, (-position[2] - 1.0) / 20.0);
-  }
-  flatTexcoord = new Float32Array(flatTexcoord);
+  let flatTexcoord = flatten(texcoords_org);
 
   if (resetBuff || positionBuffer === undefined) {
     positionBuffer = device.createBuffer({
@@ -800,11 +866,13 @@ async function render(device, context, pipeline, timestamp){
   device.queue.writeBuffer(texcoordBuffer, 0, flatTexcoord);
 
   pass.setPipeline(pipeline);
-  pass.setBindGroup(0, bindGroup);
   pass.setVertexBuffer(0, positionBuffer);
   pass.setVertexBuffer(1, colorBuffer);
   pass.setVertexBuffer(2, texcoordBuffer);
-  pass.draw(positions_org.length);
+  objectDrawRanges.forEach(range => {
+    pass.setBindGroup(0, range.object.textureBindGroup || bindGroup);
+    pass.draw(range.vertexCount, 1, range.firstVertex);
+  });
   pass.end();
   device.queue.submit([encoder.finish()]);
 
