@@ -40,8 +40,10 @@ class Constant extends Source {
 class DocItem {
   constructor(source, name = undefined, description = undefined){
     this.source = source;
-    this.name = undefined;
-    this.description = undefined;
+    this.name = name;
+    this.description = description;
+
+    const optionsDiv = document.getElementById("settings");
 
     if (!(source instanceof HTMLElement)) {
       throw new Error("Source must be an instance of HTMLElement.");
@@ -50,28 +52,28 @@ class DocItem {
     if (typeof(name) !== 'undefined') {
       this.name = document.createElement("label");
       this.name.textContent = name;
-      document.body.appendChild(this.name);
+      optionsDiv.appendChild(this.name);
     }
     
-    document.body.appendChild(this.source);
+    optionsDiv.appendChild(this.source);
     
     if (typeof(description) !== 'undefined') {
       const desc = document.createElement("p");
       desc.textContent = description;
-      document.body.appendChild(desc);
+      optionsDiv.appendChild(desc);
     }
     
-    document.body.appendChild(document.createElement("br"));
+    optionsDiv.appendChild(document.createElement("br"));
   }
   delete() {
     if (typeof(this.name) !== 'undefined') {
-      document.body.removeChild(this.name);
+      this.name.parentNode.removeChild(this.name);
     }
     if (typeof(this.description) !== 'undefined') {
-      document.body.removeChild(this.description);
+      this.description.parentNode.removeChild(this.description);
     }
     if (typeof(this.source) !== 'undefined') {
-      document.body.removeChild(this.source);
+      this.source.parentNode.removeChild(this.source);
     }
   }
 }
@@ -301,9 +303,7 @@ class Camera extends Source{
     if (typeof(this.memory) === 'undefined') {
       return this.Generate();
     }
-    if(
-      this.hasUpdate()
-    ) {
+    if(this.hasUpdate()) {
       return this.Generate();
     }
     return this.memory;
@@ -338,5 +338,226 @@ class Camera extends Source{
       const cameraMvp = this.Generate();
       device.queue.writeBuffer(uniformBuffer, 0, cameraMvp);
     }
+  }
+  Delete(){
+    this.eyePos.Delete()
+    this.viewDirection.Delete()
+    this.viewRotation.Delete()
+    this.projector.Delete()
+  }
+}
+
+class Texture extends Source{
+  constructor(device, textureFrom, isBitmap){
+    super();
+    this.device = device;
+    this.textureFrom = makeSource(textureFrom);
+    this.isBitmap = makeSource(isBitmap);
+    this.memory = undefined;
+  }
+  Get() {
+    console.log("Texture Get called");
+    if (typeof(this.memory) === 'undefined') {
+      return this.Generate();
+    }
+    if (this.hasUpdate()) {
+      return this.Generate();
+    }
+    return this.memory;
+  }
+  hasUpdate() {
+    return (
+      this.textureFrom.hasUpdate() ||
+      this.isBitmap.hasUpdate()
+    );
+  }
+  __bitmapFromPath(){
+    fetch(this.imagePath.Get()).then(response => response.blob())
+      .then(blob => createImageBitmap(blob))
+      .then(bitmap => {
+        return bitmap;
+      });
+    return null; // Return null if the bitmap is not yet available
+  }
+  Generate(){
+    let bitmap = this.textureFrom.Get();
+    let ownsBitmap = false;
+    if (this.isBitmap.Get()) {
+      const newBitmap = this.__bitmapFromPath();
+      if (newBitmap !== null) {
+        bitmap = newBitmap;
+        ownsBitmap = true;
+      }else{
+        throw new Error("Failed to create bitmap from path");
+      }
+    }
+
+    const mipLevelCount = Math.floor(Math.log2(Math.max(bitmap.width, bitmap.height))) + 1;
+    const texture = this.device.createTexture({
+      size: [bitmap.width, bitmap.height, 1],
+      mipLevelCount: mipLevelCount,
+      format: "rgba8unorm",
+      usage: GPUTextureUsage.TEXTURE_BINDING |
+      GPUTextureUsage.COPY_DST |
+      GPUTextureUsage.RENDER_ATTACHMENT,
+    });
+    const mipCanvas = document.createElement("canvas");
+    const mipContext = mipCanvas.getContext("2d");
+    for (let mipLevel = 0; mipLevel < mipLevelCount; mipLevel++) {
+      const width = Math.max(1, bitmap.width >> mipLevel);
+      const height = Math.max(1, bitmap.height >> mipLevel);
+      mipCanvas.width = width;
+      mipCanvas.height = height;
+      mipContext.drawImage(bitmap, 0, 0, width, height);
+      this.device.queue.copyExternalImageToTexture(
+        { source: mipCanvas, flipY: true },
+        { texture: texture, mipLevel: mipLevel },
+        [width, height, 1]
+      );
+    }
+    if (ownsBitmap){
+      bitmap.close();
+    }
+    this.memory = texture;
+    return this.memory;
+  }
+  Delete(){
+    this.textureFrom.Delete()
+    this.isBitmap.Delete()
+  }
+}
+
+class TextureView extends Source{
+  constructor(device, texture){
+    super();
+    this.device = device;
+    this.texture = makeSource(texture);
+    this.memory = undefined;
+  }
+  Get() {
+    if (typeof(this.memory) === 'undefined') {
+      return this.Generate();
+    }
+    if (this.hasUpdate()) {
+      return this.Generate();
+    }
+    return this.memory;
+  }
+  hasUpdate() {
+    return this.texture.hasUpdate();
+  }
+  Generate() {
+    this.memory = this.texture.Get();
+    return this.memory;
+  }
+  Delete() {
+    this.texture.Delete();
+  }
+}
+
+class TextureSampler extends Source{
+  constructor(device, addressModeU, addressModeV, magFilter, minFilter, mimpFilter, maxAnisotropy){
+    super();
+    this.device = device;
+    this.addressModeU = makeSource(addressModeU);
+    this.addressModeV = makeSource(addressModeV);
+    this.magFilter = makeSource(magFilter);
+    this.minFilter = makeSource(minFilter);
+    this.mimpFilter = makeSource(mimpFilter);
+    this.maxAnisotropy = makeSource(maxAnisotropy);
+    this.memory = undefined;
+  }
+  Get() {
+    console.log("TextureSampler Get called");
+    if (typeof(this.memory) === 'undefined') {
+      return this.Generate();
+    }
+    if (this.hasUpdate()) {
+      return this.Generate();
+    }
+    return this.memory;
+  }
+  hasUpdate() {
+    return (
+      this.addressModeU.hasUpdate() ||
+      this.addressModeV.hasUpdate() ||
+      this.magFilter.hasUpdate() ||
+      this.minFilter.hasUpdate() ||
+      this.mimpFilter.hasUpdate() ||
+      this.maxAnisotropy.hasUpdate()
+    );
+  }
+  Generate() {
+    this.memory = this.device.createSampler({
+      addressModeU: this.addressModeU.Get(),
+      addressModeV: this.addressModeV.Get(),
+      magFilter: this.magFilter.Get(),
+      minFilter: this.minFilter.Get(),
+      mipmapFilter: this.mimpFilter.Get(),
+      maxAnisotropy: this.maxAnisotropy.Get(),
+    });
+    return this.memory;
+  }
+  Delete() {
+    this.addressModeU.Delete()
+    this.addressModeV.Delete()
+    this.magFilter.Delete()
+    this.minFilter.Delete()
+    this.mimpFilter.Delete()
+    this.maxAnisotropy.Delete()
+  }
+}
+
+class TextureBindGroup extends Source{
+  constructor(device, buffer, textureSampler, textureView, pipeline){
+    super();
+    this.buffer = makeSource(buffer)
+    this.textureSampler = makeSource(textureSampler)
+    this.textureView = makeSource(textureView)
+    this.pipeline = pipeline
+    this.device = device
+    this.memory = undefined
+  }
+  Get() {
+    console.log("textureBindGroup Get called");
+    if (typeof(this.memory) === 'undefined'){
+      return this.Generate()
+    }
+    if (this.hasUpdate()){
+      return this.Generate()
+    }else{
+      return this.memory
+    }
+  }
+  hasUpdate() {
+    return (
+      this.buffer.hasUpdate() ||
+      this.textureSampler.hasUpdate() ||
+      this.textureView.hasUpdate()
+    )
+  }
+  Generate() {
+    let textureBindGroupLayout = this.pipeline.getBindGroupLayout(0);
+    this.memory = this.device.createBindGroup({
+      layout: textureBindGroupLayout,
+      entries: [
+        {
+          binding: 0,
+          resource: { buffer: this.buffer.Get() },
+        }, {
+          binding: 1,
+          resource: this.textureSampler.Get(),
+        }, {
+          binding: 2,
+          resource: this.textureView.Get(),
+        }
+      ],
+    });
+    return this.memory;
+  }
+  Delete() {
+    this.buffer.Delete()
+    this.textureSampler.Delete()
+    this.textureView.Delete()
   }
 }
