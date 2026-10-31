@@ -348,12 +348,16 @@ class Camera extends Source{
 }
 
 class Texture extends Source{
-  constructor(device, textureFrom, isBitmap){
+  constructor(device, textureFrom, isBitmap = false){
     super();
     this.device = device;
     this.textureFrom = makeSource(textureFrom);
     this.isBitmap = makeSource(isBitmap);
     this.memory = undefined;
+    this.isloadingBitmap = false;
+    this.bitmapUpdated = false;
+    this.bitmap = undefined;
+    this.bitmapPath = undefined;
   }
   Get() {
     console.log("Texture Get called");
@@ -368,28 +372,55 @@ class Texture extends Source{
   hasUpdate() {
     return (
       this.textureFrom.hasUpdate() ||
-      this.isBitmap.hasUpdate()
+      this.isBitmap.hasUpdate() ||
+      this.bitmapUpdated
     );
   }
   __bitmapFromPath(){
-    fetch(this.imagePath.Get()).then(response => response.blob())
-      .then(blob => createImageBitmap(blob))
+    const path = this.textureFrom.Get();
+    if (this.bitmap && this.bitmapPath === path) {
+      return;
+    }
+    if (this.bitmap && typeof this.bitmap.close === 'function') {
+      this.bitmap.close();
+    }
+    this.bitmapPath = path;
+    this.bitmap = document.createElement("canvas");
+    this.bitmap.width = 1;
+    this.bitmap.height = 1;
+    const context = this.bitmap.getContext("2d");
+    context.fillStyle = "#ffffff";
+    context.fillRect(0, 0, 1, 1);
+    console.log("Fetching bitmap from path: " + path);
+    this.isloadingBitmap = true;
+    fetch(path)
+      .then(response => {
+        if (!response.ok) {
+          throw new Error(`Failed to load texture ${path}: ${response.status}`);
+        }
+        return response.blob();
+      })
+      .then(blob => { return createImageBitmap(blob) })
       .then(bitmap => {
-        return bitmap;
+        if (this.bitmapPath !== path) {
+          bitmap.close();
+          return;
+        }
+        this.bitmap = bitmap;
+        this.bitmapUpdated = true;
+      })
+      .catch(error => console.error(error))
+      .finally(() => {
+        if (this.bitmapPath === path) {
+          this.isloadingBitmap = false;
+        }
       });
-    return null; // Return null if the bitmap is not yet available
   }
   Generate(){
     let bitmap = this.textureFrom.Get();
-    let ownsBitmap = false;
-    if (this.isBitmap.Get()) {
-      const newBitmap = this.__bitmapFromPath();
-      if (newBitmap !== null) {
-        bitmap = newBitmap;
-        ownsBitmap = true;
-      }else{
-        throw new Error("Failed to create bitmap from path");
-      }
+    if (!this.isBitmap.Get()) {
+      this.__bitmapFromPath();
+      bitmap = this.bitmap;
     }
 
     const mipLevelCount = Math.floor(Math.log2(Math.max(bitmap.width, bitmap.height))) + 1;
@@ -415,13 +446,22 @@ class Texture extends Source{
         [width, height, 1]
       );
     }
-    if (ownsBitmap){
-      bitmap.close();
+    if (this.memory) {
+      this.memory.destroy();
     }
+    this.bitmapUpdated = false;
     this.memory = texture;
     return this.memory;
   }
   Delete(){
+    this.bitmapPath = undefined;
+    if (this.bitmap && typeof this.bitmap.close === 'function') {
+      this.bitmap.close();
+    }
+    this.bitmap = undefined;
+    if (this.memory) {
+      this.memory.destroy();
+    }
     this.textureFrom.Delete()
     this.isBitmap.Delete()
   }
@@ -447,7 +487,7 @@ class TextureView extends Source{
     return this.texture.hasUpdate();
   }
   Generate() {
-    this.memory = this.texture.Get();
+    this.memory = this.texture.Get().createView();
     return this.memory;
   }
   Delete() {
@@ -509,7 +549,7 @@ class TextureSampler extends Source{
 }
 
 class TextureBindGroup extends Source{
-  constructor(device, buffer, textureSampler, textureView, pipeline){
+  constructor(device, pipeline, buffer, textureSampler, textureView){
     super();
     this.buffer = makeSource(buffer)
     this.textureSampler = makeSource(textureSampler)

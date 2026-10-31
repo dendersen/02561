@@ -10,15 +10,7 @@ function createUniformBuffer(device){
 
 function getDefaultTextureGroup(device, pipeline){
   if (typeof(DefaultTextureGroup) == 'undefined') {
-
-    const textureSampler = device.createSampler({
-      addressModeU: "repeat",
-      addressModeV: "repeat",
-      magFilter: "linear",
-      minFilter: "linear",
-      mipmapFilter: "linear",
-      maxAnisotropy: 1,
-    });
+    sampler = new TextureSampler(device, "repeat", "repeat", "linear", "linear", "linear", 1);
     const texture = device.createTexture({
       size: [1, 1, 1],
       format: "rgba8unorm",
@@ -26,25 +18,12 @@ function getDefaultTextureGroup(device, pipeline){
     });
     device.queue.writeTexture(
       { texture: texture },
-      new Uint8Array(color),
+      new Uint8Array([255, 255, 255, 255]),
       { bytesPerRow: 4 },
       [1, 1, 1]
     );
-    const textureView = createSolidTexture(device, [255, 255, 255, 255]).createView();
-    const textureBindGroupLayout = pipeline.getBindGroupLayout(0);
-    DefaultTextureGroup = device.createBindGroup({
-      layout: textureBindGroupLayout,
-      entries: [{
-        binding: 0,
-        resource: { buffer: createUniformBuffer(device) }
-      }, {
-        binding: 1,
-        resource: textureSampler,
-      }, {
-        binding: 2,
-        resource: textureView,
-      }],
-    });
+    const textureView = texture.createView();
+    DefaultTextureGroup = new TextureBindGroup(device, pipeline, createUniformBuffer(device), sampler, textureView);
   }
   return DefaultTextureGroup;
 }
@@ -118,7 +97,10 @@ class any3D{
     this.colors = defineColors(colors, vertexes.length);
     this.faces = faces;
     if (this.texturePath) {
-      this.textureBindGroup = createTextureBindGroup(device, this.texturePath, pipeline);
+      let buffer = createUniformBuffer(device);
+      let sampler = new TextureSampler(device, "repeat", "repeat", "linear", "linear", "linear", 1);
+      let view = new TextureView(device, new Texture(device, this.texturePath, false))
+      this.textureBindGroup = new TextureBindGroup(device, pipeline, buffer, sampler, view);
     } else {
       this.textureBindGroup = getDefaultTextureGroup(device, pipeline);
     }
@@ -283,6 +265,7 @@ class sphere3D extends any3D {
     }
   }
 }
+
 class obj3D extends any3D{
   constructor(information, isPathToObj = false) {
     super();
