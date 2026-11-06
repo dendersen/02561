@@ -44,17 +44,6 @@ async function main()
     device: device,
     format: canvasFormat,
   });
-  // Create a render pass in a command buffer and submit it
-  const encoder = device.createCommandEncoder();
-  const pass = encoder.beginRenderPass({
-    colorAttachments: [{
-      view: context.getCurrentTexture().createView(),
-      loadOp: 'clear',
-      storeOp: 'store',
-      clearValue: { r: 0.3921, g: 0.5843, b: 0.9294, a: 1.0 },
-    }], 
-  });
-  // Insert render pass commands here
   const wgslfile = "p3.wgsl";
   const wgslcode = await fetch(wgslfile).then(r => r.text());
   const wgsl = device.createShaderModule({
@@ -110,6 +99,16 @@ async function main()
   device.queue.writeBuffer(positionBuffer, /*bufferOffset=*/0, flatten(positions));
   device.queue.writeBuffer(colorBuffer, /*bufferOffset=*/0, flatten(colors));
 
+  // Acquire the canvas texture only after all asynchronous setup is complete.
+  const encoder = device.createCommandEncoder();
+  const pass = encoder.beginRenderPass({
+    colorAttachments: [{
+      view: context.getCurrentTexture().createView(),
+      loadOp: 'clear',
+      storeOp: 'store',
+      clearValue: { r: 0.3921, g: 0.5843, b: 0.9294, a: 1.0 },
+    }],
+  });
   pass.setPipeline(pipeline);
   pass.setVertexBuffer(0, positionBuffer);
   pass.setVertexBuffer(1, colorBuffer);
