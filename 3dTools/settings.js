@@ -538,7 +538,8 @@ class TextureSampler extends Source{
       this.magFilter.hasUpdate() ||
       this.minFilter.hasUpdate() ||
       this.mipmapFilter.hasUpdate() ||
-      this.maxAnisotropy.hasUpdate()
+      this.maxAnisotropy.hasUpdate() ||
+      this.mipmapping.hasUpdate()
     );
   }
   Generate() {
@@ -549,7 +550,7 @@ class TextureSampler extends Source{
       minFilter: this.minFilter.Get(),
       mipmapFilter: this.mipmapFilter.Get(),
       maxAnisotropy: this.maxAnisotropy.Get(),
-      lodMaxClamp: this.mipmapping.Get() ? 0 : 32,
+      lodMaxClamp: this.mipmapping.Get() ? 32 : 0,
     });
     return this.memory;
   }

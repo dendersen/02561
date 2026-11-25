@@ -18,6 +18,20 @@
     <div id="settings">
 
     </div>
+    <p>
+      <!--Explain the effect of the different filtering modes
+      and their influence on texture magnification and minification issues.-->
+      Texture filtering:
+      <br>
+      magFilter controls filtering when the texture is magnified.<br>
+      With nearest, the closest texel is sampled, so the image stays sharp but may look blocky. With linear, neighboring texels are blended, making the image smoother but sometimes blurrier.<br>
+      <br>
+      minFilter controls filtering when the texture is minified.<br>
+      Using nearest can look pixelated and show aliasing, while linear blends neighboring texels for a smoother result but may still show aliasing.<br>
+      <br>
+      Mipmapping can be turned on or off.<br>
+      When it is on, smaller versions of the texture help reduce aliasing when minified. mipmapFilter controls how these versions are sampled: nearest selects one mipmap level, while linear blends between levels for smoother transitions.
+    </p>
     <br><br>
 		<a href="index.html">Back to Worksheet</a>
   </body>
