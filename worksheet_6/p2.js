@@ -74,6 +74,18 @@ async function main_cube() {
     },
   });
 
+  const addressModeU = new DropDown(["repeat", "clamp-to-edge", "mirror-repeat"],"repeat","addressModeU")
+  const addressModeV = new DropDown(["repeat", "clamp-to-edge", "mirror-repeat"],"repeat","addressModeV")
+  const magFilter = new DropDown(["nearest", "linear"],"linear","magFilter")
+  const minFilter = new DropDown(["nearest", "linear"],"linear","minFilter")
+  const mipmapFilter = new DropDown(["nearest", "linear"],"linear","mipmapFilter")
+  const mipmapping = new DropDown([true, false], true, "Mipmapping");
+
+  let squareBuffer = createUniformBuffer(device);
+  let squareSampler = new TextureSampler(device, addressModeU, addressModeV, magFilter, minFilter, mipmapFilter, 1, mipmapping);
+  let squareView = new TextureView(device, new Texture(device, "squares.png", false))
+  const textureBindGroup = new TextureBindGroup(device, pipeline, squareBuffer, squareSampler, squareView);
+
   obj.push(new any3D(
     device,
     pipeline,
@@ -86,6 +98,7 @@ async function main_cube() {
     [vec4(1.0, 1.0, 1.0, 1.0)],//colors
     [[0, 1, 2],[0, 2, 3]],//indices
     "squares.png",//texture path
+    textureBindGroup, // texture bind group
     [//texcoords
       vec2(-1.5, 0.0),
       vec2(2.5, 0.0),

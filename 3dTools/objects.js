@@ -86,22 +86,22 @@ function pointDistance(p1,p2){
 }
 
 class any3D{
-  constructor(device, pipeline, vertexes, colors, faces, texturePath = undefined, texcoords = []){
+  constructor(device, pipeline, vertexes, colors, faces, texturePath = undefined, textureBindGroup = undefined, texcoords = []){
     this.device = device;
     this.vertexes = vertexes;
     this.texturePath = texturePath;
     this.texcoords = texcoords.length > 0
       ? texcoords
       : vertexes.map(vertex => vec2((vertex[0] + 4.0) / 8.0, (-vertex[2] - 1.0) / 20.0));
-    this.textureBindGroup = undefined;
+    this.textureBindGroup = textureBindGroup;
     this.colors = defineColors(colors, vertexes.length);
     this.faces = faces;
-    if (this.texturePath) {
+    if (this.texturePath && !this.textureBindGroup) {
       let buffer = createUniformBuffer(device);
       let sampler = new TextureSampler(device, "repeat", "repeat", "linear", "linear", "linear", 1);
       let view = new TextureView(device, new Texture(device, this.texturePath, false))
       this.textureBindGroup = new TextureBindGroup(device, pipeline, buffer, sampler, view);
-    } else {
+    } else if (!this.textureBindGroup) {
       this.textureBindGroup = getDefaultTextureGroup(device, pipeline);
     }
   }

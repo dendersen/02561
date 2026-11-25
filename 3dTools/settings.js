@@ -117,7 +117,11 @@ class DropDown extends Source {
     this.options.forEach(option => {
       const opt = document.createElement("option");
       opt.value = option;
-      opt.textContent = option;
+      let context = option;
+      if (typeof(context) === 'boolean') {
+        context = context ? "on" : "off";
+      }
+      opt.textContent = context;
       this.input.appendChild(opt);
     });
     this.input.value = init;
@@ -135,7 +139,13 @@ class DropDown extends Source {
     return this.updated;
   }
   Generate() {
-    return this.input.value;
+    let tempVal = this.input.value;
+    if (tempVal === "true") {
+      tempVal = true;
+    } else if (tempVal === "false") {
+      tempVal = false;
+    }
+    return tempVal;
   }
   Delete() {
     this.doc.delete();
@@ -422,8 +432,8 @@ class Texture extends Source{
       this.__bitmapFromPath();
       bitmap = this.bitmap;
     }
-
-    const mipLevelCount = Math.floor(Math.log2(Math.max(bitmap.width, bitmap.height))) + 1;
+    
+    const mipLevelCount = numMipLevels(bitmap.width, bitmap.height);
     const texture = this.device.createTexture({
       size: [bitmap.width, bitmap.height, 1],
       mipLevelCount: mipLevelCount,
@@ -432,20 +442,12 @@ class Texture extends Source{
       GPUTextureUsage.COPY_DST |
       GPUTextureUsage.RENDER_ATTACHMENT,
     });
-    const mipCanvas = document.createElement("canvas");
-    const mipContext = mipCanvas.getContext("2d");
-    for (let mipLevel = 0; mipLevel < mipLevelCount; mipLevel++) {
-      const width = Math.max(1, bitmap.width >> mipLevel);
-      const height = Math.max(1, bitmap.height >> mipLevel);
-      mipCanvas.width = width;
-      mipCanvas.height = height;
-      mipContext.drawImage(bitmap, 0, 0, width, height);
-      this.device.queue.copyExternalImageToTexture(
-        { source: mipCanvas, flipY: true },
-        { texture: texture, mipLevel: mipLevel },
-        [width, height, 1]
-      );
-    }
+    this.device.queue.copyExternalImageToTexture(
+      { source: bitmap, flipY: true },
+      { texture },
+      [bitmap.width, bitmap.height, 1]
+    );
+    generateMipmap(this.device, texture);
     if (this.memory) {
       this.memory.destroy();
     }
@@ -496,15 +498,27 @@ class TextureView extends Source{
 }
 
 class TextureSampler extends Source{
-  constructor(device, addressModeU, addressModeV, magFilter, minFilter, mimpFilter, maxAnisotropy){
+  /**
+   * 
+   * @param {*} device 
+   * @param {*} addressModeU wrapping modes: "clamp-to-edge" "repeat" "mirror-repeat"
+   * @param {*} addressModeV wrapping modes: "clamp-to-edge" "repeat" "mirror-repeat"
+   * @param {*} magFilter filtering modes: "nearest" "linear"
+   * @param {*} minFilter filtering modes: "nearest" "linear"
+   * @param {*} mipmapFilter filtering modes: "nearest" "linear"
+   * @param {*} maxAnisotropy values from 1 to 16
+   * @param {*} mipmapping boolean indicating whether mipmapping should be used
+   */
+  constructor(device, addressModeU, addressModeV, magFilter, minFilter, mipmapFilter, maxAnisotropy, mipmapping = true){
     super();
     this.device = device;
     this.addressModeU = makeSource(addressModeU);
     this.addressModeV = makeSource(addressModeV);
     this.magFilter = makeSource(magFilter);
     this.minFilter = makeSource(minFilter);
-    this.mimpFilter = makeSource(mimpFilter);
+    this.mipmapFilter = makeSource(mipmapFilter);
     this.maxAnisotropy = makeSource(maxAnisotropy);
+    this.mipmapping = makeSource(mipmapping);
     this.memory = undefined;
   }
   Get() {
@@ -523,7 +537,7 @@ class TextureSampler extends Source{
       this.addressModeV.hasUpdate() ||
       this.magFilter.hasUpdate() ||
       this.minFilter.hasUpdate() ||
-      this.mimpFilter.hasUpdate() ||
+      this.mipmapFilter.hasUpdate() ||
       this.maxAnisotropy.hasUpdate()
     );
   }
@@ -533,8 +547,9 @@ class TextureSampler extends Source{
       addressModeV: this.addressModeV.Get(),
       magFilter: this.magFilter.Get(),
       minFilter: this.minFilter.Get(),
-      mipmapFilter: this.mimpFilter.Get(),
+      mipmapFilter: this.mipmapFilter.Get(),
       maxAnisotropy: this.maxAnisotropy.Get(),
+      lodMaxClamp: this.mipmapping.Get() ? 0 : 32,
     });
     return this.memory;
   }
@@ -543,8 +558,9 @@ class TextureSampler extends Source{
     this.addressModeV.Delete()
     this.magFilter.Delete()
     this.minFilter.Delete()
-    this.mimpFilter.Delete()
+    this.mipmapFilter.Delete()
     this.maxAnisotropy.Delete()
+    this.mipmapping.Delete()
   }
 }
 
