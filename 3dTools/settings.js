@@ -159,6 +159,7 @@ class Number extends Source {
     this.input = document.createElement("input");
     this.input.type = "number";
     this.input.value = value;
+    this.mem = value;
     this.updated = false;
     this.onChange = () => {this.updated = true;};
     this.input.addEventListener("input", () => {
@@ -167,13 +168,18 @@ class Number extends Source {
     this.doc = new DocItem(this.input, name, description);
   }
   Get() {
-    return this.isFloat ? parseFloat(this.input.value) : parseInt(this.input.value);
+    return this.Generate();
   }
   hasUpdate() {
     return this.updated;
   }
   Generate() {
-    return this.isFloat ? parseFloat(this.input.value) : parseInt(this.input.value);
+    let temp = this.isFloat ? parseFloat(this.input.value) : parseInt(this.input.value);
+    if (isNaN(temp)) {
+      return this.mem;
+    }
+    this.mem = temp;
+    return temp;
   }
   Delete() {
     this.doc.delete();

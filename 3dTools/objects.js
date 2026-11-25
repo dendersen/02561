@@ -142,127 +142,187 @@ class any3D{
 }
 
 class sphere3D extends any3D {
-  constructor(device, pipeline, center, radius, colors, texturePath = undefined, texcoords = [], initialSubdivides = 0) {
-    super();
+  constructor(device, pipeline, center, radius, colors, texturePath = undefined, texcoords = [], initialSubdivides = 0, maxAnisotropy = 1) {
+    const subdivisionSource = makeSource(initialSubdivides);
+    const subdivisionLevel = subdivisionSource.Get();
+    const geometry = sphere3D.createGeometry(
+      center,
+      radius,
+      colors,
+      subdivisionLevel,
+      texcoords
+    );
+    super(
+      device,
+      pipeline,
+      geometry.vertices,
+      geometry.colors,
+      geometry.faces,
+      texturePath,
+      undefined,
+      geometry.texcoords
+    );
+    if (texturePath) {
+      this.textureBindGroup.textureSampler = new TextureSampler(
+        device, "repeat", "clamp-to-edge", "linear", "linear", "linear", maxAnisotropy
+      );
+    }
     this.center = center;
     this.radius = radius;
-    
-    this.colors = defineColors(colors, 4);
-
-    let p1 = vec3(0.0, 0.0, 1.0)
-    let p2 = vec3(0.0, (2*Math.sqrt(2.0)/3), -1.0/3)
-    let p3 = vec3(-Math.sqrt(6.0)/3, -Math.sqrt(2.0)/3, -1.0/3)
-    let p4 = vec3(Math.sqrt(6.0)/3, -Math.sqrt(2.0)/3, -1.0/3)
-
-    this.vertexes = [p1, p2, p3, p4];
-
-    this.faces = []
-    this.faces.push([0, 1, 2]);
-    this.faces.push([0, 2, 3]);
-    this.faces.push([0, 3, 1]);
-    this.faces.push([1, 3, 2]);
-    this.divisions = 0;
-    this.pushOnCircle();
-    this.subdivide(initialSubdivides)
+    this.baseColors = geometry.baseColors;
+    this.baseTexcoords = texcoords;
+    this.subdivisionSource = subdivisionSource;
+    this.divisions = subdivisionLevel;
   }
-  pushOnCircle() {
-    for (let i = 0; i < this.vertexes.length; i++) {
-      let p = this.vertexes[i];
-      let dir = subtract(p, this.center);
-      let len = Math.sqrt(dot(dir, dir));
-      if (len == 0) {
-        this.vertexes[i] = add(this.center, vec3(this.radius, 0, 0));
-      } else {
-        this.vertexes[i] = add(this.center, scale(this.radius / len, dir));
+  static createGeometry(center, radius, colors, subdivisions, texcoords) {
+    if (
+      typeof subdivisions !== "number" ||
+      !isFinite(subdivisions) ||
+      Math.floor(subdivisions) !== subdivisions ||
+      subdivisions < 0
+    ) {
+      throw new RangeError("Subdivision level must be a non-negative integer.");
+    }
+
+    const baseColors = defineColors(colors, 4).map(color =>
+      vec3(color[0], color[1], color[2])
+    );
+    const projectToSphere = point => {
+      const direction = subtract(point, center);
+      const length = Math.sqrt(dot(direction, direction));
+      return length === 0
+        ? add(center, vec3(radius, 0, 0))
+        : add(center, scale(radius / length, direction));
+    };
+    const midpoint = (a, b) => vec3(
+      (a[0] + b[0]) / 2,
+      (a[1] + b[1]) / 2,
+      (a[2] + b[2]) / 2
+    );
+    const midpointColor = (a, b) => vec3(
+      (a[0] + b[0]) / 2,
+      (a[1] + b[1]) / 2,
+      (a[2] + b[2]) / 2
+    );
+    const midpointTexcoord = (a, b) => vec2(
+      (a[0] + b[0]) / 2,
+      (a[1] + b[1]) / 2
+    );
+    const initialVertices = [
+      vec3(0, 0, 1),
+      vec3(0, 2 * Math.sqrt(2) / 3, -1 / 3),
+      vec3(-Math.sqrt(6) / 3, -Math.sqrt(2) / 3, -1 / 3),
+      vec3(Math.sqrt(6) / 3, -Math.sqrt(2) / 3, -1 / 3),
+    ].map(projectToSphere);
+    const initialTexcoords = texcoords.length === 4
+      ? texcoords
+      : initialVertices.map(vertex =>
+        vec2((vertex[0] + 4) / 8, (-vertex[2] - 1) / 20)
+      );
+    let triangles = [
+      [[0, 1, 2], [0, 1, 2]],
+      [[0, 2, 3], [0, 2, 3]],
+      [[0, 3, 1], [0, 3, 1]],
+      [[1, 3, 2], [1, 3, 2]],
+    ].map(([indices, colorIndices]) => ({
+      vertices: indices.map(index => initialVertices[index]),
+      colors: colorIndices.map(index => baseColors[index]),
+      texcoords: indices.map(index => initialTexcoords[index]),
+    }));
+
+    for (let level = 0; level < subdivisions; level++) {
+      const nextTriangles = [];
+      for (const triangle of triangles) {
+        const [a, b, c] = triangle.vertices;
+        const [colorA, colorB, colorC] = triangle.colors;
+        const [uvA, uvB, uvC] = triangle.texcoords;
+        const ab = projectToSphere(midpoint(a, b));
+        const bc = projectToSphere(midpoint(b, c));
+        const ca = projectToSphere(midpoint(c, a));
+        const colorAB = midpointColor(colorA, colorB);
+        const colorBC = midpointColor(colorB, colorC);
+        const colorCA = midpointColor(colorC, colorA);
+        const uvAB = midpointTexcoord(uvA, uvB);
+        const uvBC = midpointTexcoord(uvB, uvC);
+        const uvCA = midpointTexcoord(uvC, uvA);
+        nextTriangles.push(
+          { vertices: [a, ab, ca], colors: [colorA, colorAB, colorCA], texcoords: [uvA, uvAB, uvCA] },
+          { vertices: [ab, b, bc], colors: [colorAB, colorB, colorBC], texcoords: [uvAB, uvB, uvBC] },
+          { vertices: [ca, bc, c], colors: [colorCA, colorBC, colorC], texcoords: [uvCA, uvBC, uvC] },
+          { vertices: [ab, bc, ca], colors: [colorAB, colorBC, colorCA], texcoords: [uvAB, uvBC, uvCA] }
+        );
       }
+      triangles = nextTriangles;
     }
-  }
-  subdivideSingle(){
-    let newVertexes = [];
-    let newColors = [];
-    let newFaces = [];
-    for (let i = 0; i < this.faces.length; i++) {
-      let p1 = this.vertexes[this.faces[i][0]];
-      let p2 = this.vertexes[this.faces[i][1]];
-      let p3 = this.vertexes[this.faces[i][2]];
-      let p1_2 = vec3(
-        (p1[0] + p2[0]) / 2,
-        (p1[1] + p2[1]) / 2,
-        (p1[2] + p2[2]) / 2
-      );
-      let p2_3 = vec3(
-        (p2[0] + p3[0]) / 2,
-        (p2[1] + p3[1]) / 2,
-        (p2[2] + p3[2]) / 2
-      );
-      let p3_1 = vec3(
-        (p3[0] + p1[0]) / 2,
-        (p3[1] + p1[1]) / 2,
-        (p3[2] + p1[2]) / 2
-      );
-      let c1 = this.colors[this.faces[i][0]];
-      let c2 = this.colors[this.faces[i][1]];
-      let c3 = this.colors[this.faces[i][2]];
-      let c1_2 = vec3(
-        (c1[0] + c2[0]) / 2,
-        (c1[1] + c2[1]) / 2,
-        (c1[2] + c2[2]) / 2
-      );
-      let c2_3 = vec3(
-        (c2[0] + c3[0]) / 2,
-        (c2[1] + c3[1]) / 2,
-        (c2[2] + c3[2]) / 2
-      );
-      let c3_1 = vec3(
-        (c3[0] + c1[0]) / 2,
-        (c3[1] + c1[1]) / 2,
-        (c3[2] + c1[2]) / 2
-      );
-      startIndex = newVertexes.length;
-      newVertexes.push(p1); newColors.push(c1);
-      newVertexes.push(p2); newColors.push(c2);
-      newVertexes.push(p3); newColors.push(c3);
-      newVertexes.push(p1_2); newColors.push(c1_2);
-      newVertexes.push(p2_3); newColors.push(c2_3);
-      newVertexes.push(p3_1); newColors.push(c3_1);
 
-      p1_i = startIndex;
-      p2_i = startIndex + 1;
-      p3_i = startIndex + 2;
-      p1_2_i = startIndex + 3;
-      p2_3_i = startIndex + 4;
-      p3_1_i = startIndex + 5;
-
-      newFaces.push([p1_i, p1_2_i, p3_1_i]);
-      newFaces.push([p1_2_i, p2_3_i, p3_1_i]);
-      newFaces.push([p2_3_i, p3_i, p3_1_i]);
-      newFaces.push([p1_2_i, p2_3_i, p3_1_i]);
+    const vertices = [];
+    const vertexColors = [];
+    const vertexTexcoords = [];
+    const faces = [];
+    for (const triangle of triangles) {
+      const firstVertex = vertices.length;
+      vertices.push(...triangle.vertices);
+      vertexColors.push(...triangle.colors);
+      vertexTexcoords.push(...triangle.texcoords);
+      faces.push([firstVertex, firstVertex + 1, firstVertex + 2]);
     }
-    this.cleanupVertexes()
-    this.vertexes = newVertexes;
-    this.colors = newColors;
-    this.faces = newFaces;
+    return {
+      vertices,
+      colors: vertexColors,
+      faces,
+      texcoords: vertexTexcoords,
+      baseColors,
+    };
   }
   subdivide(target) {
-    if (this.divisions > target) {
-      let temp = new sphere3D(this.device, this.pipeline, this.center, this.radius, this.colors, this.texturePath, this.texcoords, target);
-      this.faces = temp.faces;
-      this.vertexes = temp.vertexes;
+    if (
+      typeof target !== "number" ||
+      !isFinite(target) ||
+      Math.floor(target) !== target ||
+      target < 0
+    ) {
+      throw new RangeError("Subdivision level must be a non-negative integer.");
     }
-    while(this.divisions < target) {
-      this.subdivideSingle();
+    if (this.divisions === target) {
+      return;
     }
-
-
-    while (this.divisions < target) {
-      let newTriangles = [];
-      for (let i = 0; i < this.triangles.length; i++) {
-        let subdivided = this.triangles[i].subdivide(this.center, this.radius);
-        newTriangles.push(...subdivided);
+    const geometry = sphere3D.createGeometry(
+      this.center,
+      this.radius,
+      this.baseColors,
+      target,
+      this.baseTexcoords
+    );
+    this.vertexes = geometry.vertices;
+    this.colors = defineColors(geometry.colors, geometry.vertices.length);
+    this.faces = geometry.faces;
+    this.texcoords = geometry.texcoords;
+    this.divisions = target;
+  }
+  draw(position_array = undefined, color_array = undefined, texcoord_array = undefined) {
+    let updated = false;
+    if (this.subdivisionSource.hasUpdate()) {
+      const target = this.subdivisionSource.Get();
+      if (target !== this.divisions) {
+        this.subdivide(target);
+        updated = true;
       }
-      this.triangles = newTriangles;
-      this.divisions++;
     }
+    if (
+      typeof(position_array) !== "undefined" ||
+      typeof(color_array) !== "undefined" ||
+      typeof(texcoord_array) !== "undefined"
+    ) {
+      if (
+        typeof(position_array) === "undefined" ||
+        typeof(color_array) === "undefined" ||
+        typeof(texcoord_array) === "undefined"
+      ) {
+        throw new Error("Sphere drawing requires position, color, and texture-coordinate arrays.");
+      }
+      super.draw(position_array, color_array, texcoord_array);
+    }
+    return updated;
   }
 }
 

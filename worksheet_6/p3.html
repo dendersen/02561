@@ -1,0 +1,39 @@
+<!DOCTYPE html>
+<html>
+  <head>
+    <title>Week 6, Part 3</title>
+    <script type="text/javascript" src="../MV.js"></script>
+    <script type="text/javascript" src="../3dTools/settings.js"></script>
+    <script type="text/javascript" src="../genmipmap.js"></script>
+    <script type="text/javascript" src="../3dTools/objects.js"></script>
+    <script type="text/javascript" src="p3.js"></script>
+  </head>
+  <body>
+    <canvas id="triple-canvas" width="512" height="512">
+      Please use a browser that supports HTML5 canvas.
+    </canvas>
+    <br>
+    <div id="settings"></div>
+    frame rate: <output id="frameRate">0</output><br>
+    face count: <output id="faces">0</output>
+    <p>
+      <!--choices for texture mode-->
+      addressModeU is repeat, so the texture wraps around the globe at the
+      longitude seam.<br>
+      addressModeV is clamp-to-edge, so the texture does not wrap between
+      the north and south poles.<br>
+      magFilter is linear, blending neighboring texels when the texture is
+      magnified for a smoother image.<br>
+      minFilter is linear, blending neighboring texels within a mipmap level
+      when the texture is minified.<br>
+      Mipmapping is on, using smaller prefiltered textures to reduce aliasing
+      and shimmer as the camera orbits.<br>
+      mipmapFilter is linear, blending between mipmap levels to avoid abrupt
+      transitions.<br>
+      maxAnisotropy is 8, helping preserve detail where the globe is viewed
+      at an angle, with less blurring than mipmapping alone.
+    </p>
+    <br><br>
+    <a href="index.html">Back to Worksheet</a>
+  </body>
+</html>
